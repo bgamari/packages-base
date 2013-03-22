@@ -26,7 +26,6 @@
 #endif
 
 module Data.Typeable.Internal (
-    Proxy (..),
     TypeRep(..),
     Fingerprint(..),
     typeOf, typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7,
@@ -62,6 +61,7 @@ import GHC.Ptr          ( Ptr, FunPtr )
 import GHC.Stable
 import GHC.Arr          ( Array, STArray )
 import Data.Int
+import {-# SOURCE #-} Data.Proxy       ( Proxy(..) )
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
@@ -194,9 +194,6 @@ class Typeable a where
   typeRep :: proxy a -> TypeRep
   -- ^ Takes a value of type @a@ and returns a concrete representation
   -- of that type.
-
--- | A concrete, poly-kinded proxy type
-data Proxy t = Proxy
 
 -- Keeping backwards-compatibility
 typeOf :: forall a. Typeable a => a -> TypeRep

@@ -38,9 +38,6 @@
 
 module Data.Typeable
   (
-        -- * A proxy type
-        Proxy (..),
-
         -- * The Typeable class
         Typeable( typeRep ),
 
@@ -80,6 +77,7 @@ module Data.Typeable
   ) where
 
 import Data.Typeable.Internal hiding (mkTyCon)
+import {-# SOURCE #-} Data.Proxy
 
 import Unsafe.Coerce
 import Data.Maybe
