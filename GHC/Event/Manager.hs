@@ -70,6 +70,7 @@ import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid (mappend, mconcat, mempty)
+import Data.List (partition)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)
@@ -472,56 +473,28 @@ onFdEvent mgr fd evs
     -- the fd as appropriate and return this subset.
     selectCallbacks :: IntTable [FdData] -> [FdData] -> IO [FdData]
     selectCallbacks tbl fdds = do
-        let acc0 = FdAccum [] [] mempty mempty
-            --acc = foldl' accum acc0 fdds
+        let matches :: FdData -> Bool
+            matches fd = evs `I.eventIs` I.elEvent (fdEvents fd)
+            (saved, triggered) = partition matches fdds
+            savedEls = eventsOf saved
+            allEls = eventsOf fdds
 
-        case elLifetime (allEls acc) of
+        case I.elLifetime allEls of
           -- we previously armed the fd for multiple shots, no need to rearm
-          MultiShot | allEls acc == savedEls acc ->
+          MultiShot | allEls == savedEls ->
             return ()
 
           -- either we previously registered for one shot or the
           -- events of interest have changed, we must re-arm
-          _ ->
-            case elLifetime (savedEls acc) of
+          _ -> do
+            case I.elLifetime savedEls of
               OneShot | haveOneShot ->
-                I.modifyFdOnce (emBackend mgr) fd (savedEls acc)
+                I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
               _ ->
-                I.modifyFdOnce (emBackend mgr) fd (allEls acc) (savedEls acc)
+                I.modifyFd (emBackend mgr) fd (I.elEvent allEls) (I.elEvent savedEls)
+            return ()
 
-        return (triggeredEls acc)
-
-      where
-        -- | This performs the actually sorting out. As we traverse the list
-        -- we also accumulate an @EventLifetime@ for all registrations and just
-        -- those that we saved. We do this so that we can work out how we
-        -- previously armed the fd so that we can work out whether it's necessary
-        -- to re-arm.
-        accum :: FdData -> FdAccum -> FdAccum
-        accum fdd acc
-          | evs `I.isEvent` el =
-            let (saved', savedEls') =
-                  case I.elLifetime el of
-                    SingleShot -> (saved acc, savedEls acc)
-                    MultiShot  -> (fdd : saved acc, el `mappend` savedEls acc)
-            in FdAccum { triggered = fdd : triggered acc
-                       , saved     = saved'
-                       , savedEls  = savedEls'
-                       , allEls    = el `mappend` allEls acc
-                       }
-
-          | otherwise =
-            FdAccum { triggered = triggered acc
-                    , saved     = fdd : saved acc
-                    , savedEls  = el `mappend` savedEls acc
-                    , allEls    = el `mappend` allEls acc
-                    }
-          where el = fdEvent fdd
-
-
-data FdAccum = FdAccum { triggered, saved   :: ![FdData]
-                       , allEls, savedEls   :: !EventLifetime
-                       }
+        return triggered
 
 nullToNothing :: [a] -> Maybe [a]
 nullToNothing []       = Nothing
