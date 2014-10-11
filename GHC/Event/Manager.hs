@@ -346,9 +346,6 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
   return (reg,modify)
 {-# INLINE registerFd_ #-}
 
--- TODO: Delete me
-emOneShot _ = True
-
 -- | @registerFd mgr cb fd evs@ registers interest in the events @evs@
 -- on the file descriptor @fd@.  @cb@ is called for each event that
 -- occurs.  Returns a cookie that can be handed to 'unregisterFd'.
