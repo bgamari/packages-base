@@ -252,7 +252,7 @@ startIOManagerThread :: IOArray Int (Maybe (ThreadId, EventManager))
                         -> IO ()
 startIOManagerThread eventManagerArray i = do
   let create = do
-        !mgr <- new True
+        !mgr <- new
         !t <- forkOn i $ loop mgr
         labelThread t "IOManager"
         writeIOArray eventManagerArray i (Just (t,mgr))
