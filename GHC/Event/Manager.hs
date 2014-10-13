@@ -61,6 +61,9 @@ module GHC.Event.Manager
 ------------------------------------------------------------------------
 -- Imports
 
+import {-# SOURCE #-} Debug.Trace (traceEventIO)
+import System.Posix.Types (Fd(..))
+
 import Control.Concurrent.MVar (MVar, newMVar, readMVar, putMVar,
                                 tryPutMVar, takeMVar, withMVar)
 import Control.Exception (onException)
@@ -313,7 +316,7 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
       reg  = FdKey fd u
       el = I.eventLifetime evs lt
       !fdd = FdData reg el cb
-  traceEventIO $ "register fd "++show fd
+  traceEventIO $ "register fd "++show fd++" "++show evs++" "++show lt
   (modify,ok) <- withMVar (callbackTableVar mgr fd) $ \tbl -> do
     oldFdd <- IT.insertWith (++) fd' [fdd] tbl
     let el' :: EventLifetime
@@ -390,6 +393,7 @@ eventsOf fdds  = mconcat $ map fdEvents fdds
 unregisterFd_ :: EventManager -> FdKey -> IO Bool
 unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
   withMVar (callbackTableVar mgr fd) $ \tbl -> do
+    traceEventIO $ case fd of Fd n -> "unregister fd "++show n
     let dropReg = nullToNothing . filter ((/= u) . keyUnique . fdKey)
         fd' = fromIntegral fd
         pairEvents :: [FdData] -> IO (EventLifetime, EventLifetime)
@@ -427,6 +431,7 @@ closeFd mgr close fd = do
           wakeManager mgr
         close fd
         return fds
+  traceEventIO $ case fd of Fd n -> "closing fd "++show n
   forM_ fds $ \(FdData reg el cb) -> cb reg (I.elEvent el `mappend` evtClose)
 
 -- | Close a file descriptor in a race-safe way.
@@ -459,6 +464,7 @@ onFdEvent mgr fd evs
     handleControlEvent mgr fd evs
 
   | otherwise = do
+    traceEventIO $ case fd of Fd n -> "fd event on "++show n++" "++show evs
     fdds <- withMVar (callbackTableVar mgr fd) $ \tbl ->
         IT.delete fd' tbl >>= maybe (return []) (selectCallbacks tbl)
     forM_ fdds $ \(FdData reg _ cb) -> cb reg evs
@@ -477,14 +483,21 @@ onFdEvent mgr fd evs
             savedEls = eventsOf saved
             allEls = eventsOf fdds
 
+        traceEventIO $ "saved: "++show savedEls
+        traceEventIO $ "triggered: "++show (map fdEvents triggered)
+
+        -- allEls is essentially the state of things when the fd was armed
         case I.elLifetime allEls of
           -- we previously armed the fd for multiple shots, no need to rearm
-          MultiShot | allEls == savedEls ->
+          MultiShot | allEls == savedEls -> do
+            traceEventIO $ case fd of Fd n -> "no need to rearm fd "++show n
             return ()
 
           -- either we previously registered for one shot or the
           -- events of interest have changed, we must re-arm
           _ -> do
+            traceEventIO $ case fd of Fd n -> "rearming fd "++show n++" "++show savedEls
+            -- If the remaining registrations are all one-shot then re-arm one-shot 
             case I.elLifetime savedEls of
               OneShot | haveOneShot ->
                 I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
