@@ -313,19 +313,20 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
       reg  = FdKey fd u
       el = I.eventLifetime evs lt
       !fdd = FdData reg el cb
+  traceEventIO $ "register fd "++show fd
   (modify,ok) <- withMVar (callbackTableVar mgr fd) $ \tbl -> do
     oldFdd <- IT.insertWith (++) fd' [fdd] tbl
     let el' :: EventLifetime
         el' = maybe el (mappend el . eventsOf) oldFdd
     case I.elLifetime el' of
-      -- All registrations want one-shot semantics and they are supported
+      -- All registrations want one-shot semantics and this is supported
       OneShot | haveOneShot -> do
         ok <- I.modifyFdOnce emBackend fd (I.elEvent el')
         if ok
           then return (False, True)
           else IT.reset fd' oldFdd tbl >> return (False, False)
 
-      -- We don't want or can't have one-shot semantics
+      -- We don't want or don't support one-shot semantics
       _ -> do
         let oldEvs, newEvs :: Event
             (oldEvs, newEvs) =
