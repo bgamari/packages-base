@@ -473,7 +473,7 @@ onFdEvent mgr fd evs
     selectCallbacks tbl fdds = do
         let matches :: FdData -> Bool
             matches fd = evs `I.eventIs` I.elEvent (fdEvents fd)
-            (saved, triggered) = partition matches fdds
+            (triggered, saved) = partition matches fdds
             savedEls = eventsOf saved
             allEls = eventsOf fdds
 
