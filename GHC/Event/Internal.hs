@@ -100,22 +100,24 @@ instance Monoid Lifetime where
     mappend = elSupremum
 
 -- | A pair of an event and lifetime
--- TODO: More efficient encoding
-data EventLifetime = EL !Event Lifetime
-                   deriving (Show, Eq)
+newtype EventLifetime = EL Int
+                      deriving (Show, Eq)
 
 instance Monoid EventLifetime where
-    mempty = EL mempty mempty
-    EL a b `mappend` EL x y = EL (a `mappend` x) (b `mappend` y)
+    mempty = EL 0
+    EL a `mappend` EL b = EL (a .|. b)
 
 eventLifetime :: Event -> Lifetime -> EventLifetime
-eventLifetime = EL
+eventLifetime (Event e) l = EL (e .|. go l)
+  where
+    go OneShot   = 0
+    go MultiShot = 8
 
 elLifetime :: EventLifetime -> Lifetime
-elLifetime (EL _ lt) = lt
+elLifetime (EL x) = if x .&. 8 == 0 then OneShot else MultiShot
 
 elEvent :: EventLifetime -> Event
-elEvent (EL evs _) = evs
+elEvent (EL x) = Event (x .&. 0x7)
 
 -- | A type alias for timeouts, specified in seconds.
 data Timeout = Timeout {-# UNPACK #-} !Double
