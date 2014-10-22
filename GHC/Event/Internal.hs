@@ -94,6 +94,7 @@ data Lifetime = OneShot | MultiShot
 elSupremum :: Lifetime -> Lifetime -> Lifetime
 elSupremum OneShot OneShot = OneShot
 elSupremum _       _       = MultiShot
+{-# INLINE elSupremum #-}
 
 instance Monoid Lifetime where
     mempty = OneShot
@@ -112,12 +113,15 @@ eventLifetime (Event e) l = EL (e .|. go l)
   where
     go OneShot   = 0
     go MultiShot = 8
+{-# INLINE eventLifetime #-}
 
 elLifetime :: EventLifetime -> Lifetime
 elLifetime (EL x) = if x .&. 8 == 0 then OneShot else MultiShot
+{-# INLINE elLifetime #-}
 
 elEvent :: EventLifetime -> Event
 elEvent (EL x) = Event (x .&. 0x7)
+{-# INLINE elEvent #-}
 
 -- | A type alias for timeouts, specified in seconds.
 data Timeout = Timeout {-# UNPACK #-} !Double
